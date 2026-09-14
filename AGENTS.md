@@ -23,3 +23,13 @@ Flue 2.x Cloudflare project. Agents are TypeScript functions with `'use agent'`.
 - Do not use `npx flue run` for this agent (Cloudflare-only imports)
 - Do not use `npx wrangler deploy` except for production
 - Do not add `@spectrum-ts/imessage-local` to either package
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues; code changes ship as small sequential PRs with inline review comments. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
