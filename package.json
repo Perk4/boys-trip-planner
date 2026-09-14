@@ -6,14 +6,14 @@
 		"dev": "vite dev",
 		"build": "vite build",
 		"deploy": "vite build && wrangler deploy",
-		"check:types": "wrangler types && tsc --noEmit"
+		"check:types": "wrangler types && tsc --noEmit",
+		"sender:dev": "npm run dev --prefix spectrum-sender",
+		"sender:install": "npm install --prefix spectrum-sender"
 	},
 	"dependencies": {
 		"@cloudflare/computer": "^0.1.1",
 		"@flue/runtime": "^2.0.5",
-		"@flue/telegram": "^2.0.5",
 		"@platformatic/vfs": "^0.4.0",
-		"grammy": "^1.46.0",
 		"hono": "^4.12.32",
 		"valibot": "^1.5.0"
 	},

@@ -1,6 +1,6 @@
 import { defineTool } from '@flue/runtime';
 import * as v from 'valibot';
-import { getTelegramClient } from '../channels/telegram-client.ts';
+import type { BoundIMessageSpace } from '../lib/imessage-dest.ts';
 import {
 	claimKey,
 	inspectKey,
@@ -9,17 +9,13 @@ import {
 	parseLedger,
 	serializeLedger,
 } from '../lib/outbound-ledger.ts';
+import { sendViaSpectrumBridge } from '../lib/spectrum-bridge.ts';
 
-export interface BoundTelegramChat {
-	chatId: number;
-	messageThreadId?: number;
-}
-
-export function postToChannel(dest: BoundTelegramChat | undefined) {
+export function postToChannel(dest: BoundIMessageSpace | undefined) {
 	return defineTool({
 		name: 'post_to_channel',
 		description:
-			'Post text to the Telegram group bound to this trip. Always pass a stable idempotencyKey so retries do not double-send.',
+			'Post text to the iMessage space bound to this trip (Photon sidecar). Always pass a stable idempotencyKey so retries do not double-send.',
 		harness: true,
 		input: v.object({
 			text: v.pipe(v.string(), v.minLength(1)),
@@ -30,14 +26,13 @@ export function postToChannel(dest: BoundTelegramChat | undefined) {
 			reason: v.optional(v.string()),
 			deduplicated: v.optional(v.boolean()),
 			providerMessageId: v.optional(v.nullable(v.string())),
-			messageId: v.optional(v.number()),
 		}),
-		async run({ data, harness }) {
+		async run({ data, harness, signal }) {
 			if (!dest) {
 				return {
 					output: {
 						ok: false,
-						reason: 'No Telegram destination is bound to this conversation.',
+						reason: 'No iMessage space is bound to this conversation.',
 					},
 				};
 			}
@@ -62,17 +57,41 @@ export function postToChannel(dest: BoundTelegramChat | undefined) {
 				await harness.sandbox.writeFile(OUTBOUND_LEDGER_PATH, serializeLedger(claimed.ledger));
 			}
 
-			const client = getTelegramClient();
-			if (!client) {
-				return { output: { ok: false, reason: 'TELEGRAM_BOT_TOKEN is not set.' } };
+			const sent = await sendViaSpectrumBridge(
+				{
+					url: process.env.SPECTRUM_BRIDGE_URL,
+					token: process.env.SPECTRUM_BRIDGE_TOKEN,
+				},
+				{
+					spaceId: dest.spaceId,
+					spaceType: dest.spaceType,
+					phone: dest.phone,
+					...(dest.senderId === undefined ? {} : { senderId: dest.senderId }),
+					text: data.text,
+					clientGuid: data.idempotencyKey,
+				},
+				signal,
+			);
+
+			if (!sent.ok) {
+				return { output: { ok: false, reason: sent.reason } };
 			}
 
-			const message = await client.sendMessage(dest.chatId, data.text, {
-				...(dest.messageThreadId ? { message_thread_id: dest.messageThreadId } : {}),
-			});
-			const sent = markSent(claimed.ledger, data.idempotencyKey, String(message.message_id));
-			await harness.sandbox.writeFile(OUTBOUND_LEDGER_PATH, serializeLedger(sent));
-			return { output: { ok: true, messageId: message.message_id } };
+			if (sent.providerMessageId) {
+				const marked = markSent(claimed.ledger, data.idempotencyKey, sent.providerMessageId);
+				await harness.sandbox.writeFile(OUTBOUND_LEDGER_PATH, serializeLedger(marked));
+			} else {
+				const marked = markSent(claimed.ledger, data.idempotencyKey, sent.deduplicated ? 'deduplicated' : 'sent');
+				await harness.sandbox.writeFile(OUTBOUND_LEDGER_PATH, serializeLedger(marked));
+			}
+
+			return {
+				output: {
+					ok: true,
+					deduplicated: sent.deduplicated,
+					providerMessageId: sent.providerMessageId ?? null,
+				},
+			};
 		},
 	});
 }

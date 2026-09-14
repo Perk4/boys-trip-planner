@@ -1,4 +1,5 @@
 import type { DeliveredMessage } from '@flue/runtime';
+import { utcDayIso } from './utc-periods.ts';
 
 export const OPEN_DECISIONS_SIGNAL_TYPE = 'schedule.open_decisions';
 
@@ -18,6 +19,4 @@ export function openDecisionsIdempotencyKey(tripId: string, dayIso: string): str
 	return `${OPEN_DECISIONS_SIGNAL_TYPE}:${tripId}:${dayIso}`;
 }
 
-export function utcDayIso(at: Date = new Date()): string {
-	return at.toISOString().slice(0, 10);
-}
+export { utcDayIso };

@@ -6,4 +6,9 @@ import { defineConfig } from 'vite';
 // entry and the merged wrangler config the Cloudflare plugin consumes.
 export default defineConfig({
 	plugins: [flue({ providers: ['cloudflare'] }), cloudflare({ config: flueWorkerConfig() })],
+	server: {
+		watch: {
+			ignored: ['**/spectrum-sender/**'],
+		},
+	},
 });

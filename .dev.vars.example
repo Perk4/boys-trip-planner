@@ -2,6 +2,12 @@
 # Cloudflare loads `.dev.vars` into the local Worker. Do not also keep a
 # conflicting `.env` — when `.dev.vars` exists, `.env` is not loaded.
 
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_WEBHOOK_SECRET_TOKEN=
+# Photon native webhook signing secret (from webhook registration).
+SPECTRUM_WEBHOOK_SECRET=
+
+# Node sidecar that runs spectrum-ts and calls space.send.
+SPECTRUM_BRIDGE_URL=http://127.0.0.1:8788
+SPECTRUM_BRIDGE_TOKEN=
+
+# Optional. When set, /agents/* and /internal/* require `Authorization: Bearer <token>`.
 AGENT_HTTP_TOKEN=

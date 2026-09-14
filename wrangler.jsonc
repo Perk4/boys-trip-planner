@@ -14,7 +14,8 @@
 	"vars": {
 		"TRIP_CONVERSATION_ID": "trip:boys-vegas-2026",
 		"ENABLE_BROWSER": "false",
-		"NUDGE_EVERY_SECONDS": "86400"
+		"NUDGE_EVERY_SECONDS": "86400",
+		"TASK_TICK_EVERY_SECONDS": "3600"
 	},
 	// TripPlanner -> FlueTripPlannerAgent / FLUE_TRIP_PLANNER_AGENT
 	"migrations": [
