@@ -1,0 +1,7 @@
+# Copy to `.dev.vars` for `vite dev` / `wrangler dev`.
+# Cloudflare loads `.dev.vars` into the local Worker. Do not also keep a
+# conflicting `.env` — when `.dev.vars` exists, `.env` is not loaded.
+
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET_TOKEN=
+AGENT_HTTP_TOKEN=

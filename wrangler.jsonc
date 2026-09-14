@@ -1,0 +1,26 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "boys-trip-planner",
+	"compatibility_date": "2026-09-13",
+	// "experimental" is required by the cloudflare-computer worker-shell backend.
+	"compatibility_flags": ["nodejs_compat", "experimental"],
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1,
+		"traces": { "enabled": true }
+	},
+	"ai": { "binding": "AI" },
+	"worker_loaders": [{ "binding": "LOADER" }],
+	"vars": {
+		"TRIP_CONVERSATION_ID": "trip:boys-vegas-2026",
+		"ENABLE_BROWSER": "false",
+		"NUDGE_EVERY_SECONDS": "86400"
+	},
+	// TripPlanner -> FlueTripPlannerAgent / FLUE_TRIP_PLANNER_AGENT
+	"migrations": [
+		{
+			"tag": "flue-class-FlueTripPlannerAgent",
+			"new_sqlite_classes": ["FlueTripPlannerAgent"]
+		}
+	]
+}

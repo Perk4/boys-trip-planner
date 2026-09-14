@@ -1,0 +1,29 @@
+{
+	"name": "boys-trip-planner",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"deploy": "vite build && wrangler deploy",
+		"check:types": "wrangler types && tsc --noEmit"
+	},
+	"dependencies": {
+		"@cloudflare/computer": "^0.1.1",
+		"@flue/runtime": "^2.0.5",
+		"@flue/telegram": "^2.0.5",
+		"@platformatic/vfs": "^0.4.0",
+		"grammy": "^1.46.0",
+		"hono": "^4.12.32",
+		"valibot": "^1.5.0"
+	},
+	"devDependencies": {
+		"@cloudflare/vite-plugin": "^1.39.2",
+		"@flue/cli": "^2.0.5",
+		"@flue/vite": "^2.0.5",
+		"@types/node": "^22.10.10",
+		"typescript": "^7.0.2",
+		"vite": "^8.0.14",
+		"wrangler": "^4.113.0"
+	}
+}
