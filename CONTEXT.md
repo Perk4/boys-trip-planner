@@ -20,6 +20,10 @@ _Avoid_: Channel, conversation, chat, group (when you mean Photon’s thread)
 A Space used only to prove one Outbound send, not the production boys group.
 _Avoid_: Live group, production space
 
+**Bind**:
+The first inbound contact that stores the Space on the Trip. Later contacts do not replace it.
+_Avoid_: Prime, connect, register (Photon webhook registration is a different act)
+
 **Section**:
 A city or leg of a Trip whose facts are kept together.
 _Avoid_: Destination (that word is the Wayfinder end-state), stop, city file
