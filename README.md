@@ -2,7 +2,7 @@
 
 Proactive group-chat trip harness on **Flue 2.x + Cloudflare**, with **iMessage via Photon Spectrum**.
 
-One Durable Object conversation is one trip (`trip:boys-vegas-2026`). Artifacts live on Cloudflare Computer (SQLite-backed `/workspace`). The iMessage group is the human surface. Daily open-decision nudges and named research jobs (hotels for Madrid, etc.) run on the same Durable Object.
+One Durable Object conversation is one trip (`trip:boys-vegas-2026`). Artifacts live on Cloudflare Computer (SQLite-backed `/workspace`). The iMessage Space is the human surface. Daily open-decision nudges and named research jobs (hotels for Madrid, etc.) run on the same Durable Object.
 
 ## Why iMessage is split in two processes
 
@@ -15,19 +15,20 @@ Photon’s own docs are the constraint, not a preference:
 So the Worker never imports `spectrum-ts`. Ingress is HMAC. Egress is an authenticated HTTP hop to `spectrum-sender/`.
 
 ```
-iMessage group
+iMessage Space (usable-core: DM Test Space)
     → Photon Spectrum Cloud
     → signed POST /channels/imessage/webhook     (this Worker: verify + dispatch)
+         local: cloudflared HTTPS origin → vite dev :5173
     → TripPlanner DO  trip:<slug>
          Computer workspace: itinerary, sections, tasks, ledger
          scheduleEvery: open-decisions + research tick
     → post_to_channel claims /workspace/ledger/outbound.json
     → POST SPECTRUM_BRIDGE_URL/send
     → spectrum-sender  im.space.get(spaceId).send(...)
-    → iMessage group
+    → iMessage Space
 ```
 
-Boys-trip groups need a **Photon Business dedicated line**. Shared-pool lines do not create groups and do not subscribe to group-change events. `space.get(chatGuid)` works for an existing group; with two or more dedicated lines you must persist the webhook’s `space.phone` and pass it through.
+Usable-core Bind is a **DM Test Space** on the project's shared-pool iMessage line (`spaceType` `dm`, `phone` omitted / `shared`). A live boys **group** needs a **Photon Business dedicated line** and is after this destination. Shared-pool lines do not create groups and do not subscribe to group-change events. `space.get(chatGuid)` works for an existing group; with two or more dedicated lines you must persist the webhook’s `space.phone` and pass it through.
 
 `space.id` is opaque (DM like `any;-;+E.164`, groups = chat GUID). The Flue conversation id stays `trip:<slug>`. The Photon space is stored in `initialData` (`spaceId`, `spaceType`, `phone`), not encoded as the Durable Object name.
 
@@ -62,31 +63,29 @@ The hourly tick always `dispatch`es; the model must no-op when nothing is due.
 
 ## Setup
 
+Do not HTTP-prime the Trip. Flue consults `initialData` only when the instance is created; later webhook Space fields are ignored. First contact that creates `trip:boys-vegas-2026` must be a Photon `messages` webhook via the tunnel.
+
 ```sh
 npm install
+npx wrangler login
 cp .dev.vars.example .dev.vars
 npm run sender:install
 cp spectrum-sender/.env.example spectrum-sender/.env
-npm run dev
 ```
 
-In another terminal, after filling sidecar secrets:
+`vite dev` uses the remote Workers AI binding. There is no model API key, but a Wrangler account session is required (`npx wrangler login`).
 
-```sh
-npm run sender:dev
-```
+Fill names that already exist locally (do not commit values):
 
-Workers AI needs no key. Photon secrets are optional for the local HTTP agent path. An unset `SPECTRUM_WEBHOOK_SECRET` does not crash `vite dev`; the webhook returns 500 until you set it.
-
-### Required secrets (production)
-
-| Name | Where | Why |
+| Name | Where | Local usable-core |
 | --- | --- | --- |
-| `SPECTRUM_WEBHOOK_SECRET` | Worker | HMAC for `/channels/imessage/webhook` (Photon’s `signingSecret` at registration) |
-| `SPECTRUM_BRIDGE_URL` | Worker | Public base URL of `spectrum-sender` |
-| `SPECTRUM_BRIDGE_TOKEN` | Worker + sidecar | Bearer for `/send` |
-| `SPECTRUM_PROJECT_ID` / `SPECTRUM_PROJECT_SECRET` | Sidecar only | `Spectrum()` + `imessage.config()` auto-discovery |
-| `AGENT_HTTP_TOKEN` | Worker | Bearer for `/agents/*` and `/internal/*` |
+| `SPECTRUM_BRIDGE_URL` | `.dev.vars` | `http://127.0.0.1:8788` |
+| `SPECTRUM_BRIDGE_TOKEN` | `.dev.vars` and `spectrum-sender/.env` (same value) | Required for `/send` |
+| `SPECTRUM_PROJECT_ID` / `SPECTRUM_PROJECT_SECRET` | `spectrum-sender/.env` only | Sidecar `Spectrum()` |
+| `SPECTRUM_WEBHOOK_SECRET` | `.dev.vars` | Photon’s one-time `signingSecret` after webhook registration (below). Not `standardSigningSecret` / `whsec_`. |
+| `AGENT_HTTP_TOKEN` | `.dev.vars` | Leave unset so demo curls work without `Authorization` |
+
+Use the inventoried **DM Test Space** (Photon DM GUID the sidecar can `space.get`). Do not use `local-dev-group`.
 
 Non-secret vars (already in `wrangler.jsonc`):
 
@@ -97,30 +96,71 @@ Non-secret vars (already in `wrangler.jsonc`):
 | `NUDGE_EVERY_SECONDS` | `86400` |
 | `TASK_TICK_EVERY_SECONDS` | `3600` |
 
+**Worker Loader** (`worker_loaders` / `LOADER`) is required for Cloudflare Computer’s just-bash backend. It is beta-gated on the Cloudflare account.
+
+### Usable-core start order
+
+Keep these processes running. Restart **only** `vite dev` after writing `SPECTRUM_WEBHOOK_SECRET`.
+
+1. **Sidecar** (after filling `spectrum-sender/.env`):
+
 ```sh
-npx wrangler secret put SPECTRUM_WEBHOOK_SECRET
-npx wrangler secret put SPECTRUM_BRIDGE_TOKEN
-npx wrangler secret put AGENT_HTTP_TOKEN
+npm run sender:dev
 ```
 
-Register the Photon webhook (save `signingSecret` once):
+2. **Vite** (after filling `.dev.vars` except the webhook secret, which may still be empty):
+
+```sh
+npm run dev
+```
+
+An unset `SPECTRUM_WEBHOOK_SECRET` does not crash `vite dev`; `POST /channels/imessage/webhook` returns 500 until the secret is set and Vite is restarted.
+
+3. **Tunnel** — [cloudflared Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/) in front of local Vite. Photon will not POST to `127.0.0.1`.
+
+```sh
+cloudflared tunnel --url http://localhost:5173
+```
+
+Copy the printed `https://*.trycloudflare.com` origin. Keep this process up; a new origin is a new webhook URL.
+
+4. **Register** the Photon webhook ([Managing webhooks](https://photon.codes/docs/webhooks/managing-webhooks)). Save `data.signingSecret` immediately — it is returned once.
 
 ```sh
 curl -X POST "https://spectrum.photon.codes/projects/$SPECTRUM_PROJECT_ID/webhooks/" \
   -u "$SPECTRUM_PROJECT_ID:$SPECTRUM_PROJECT_SECRET" \
   -H "Content-Type: application/json" \
-  -d '{"webhookUrl":"https://<worker>/channels/imessage/webhook"}'
+  -d '{"webhookUrl":"https://<cloudflared-host>/channels/imessage/webhook"}'
 ```
 
-**Worker Loader** (`worker_loaders` / `LOADER`) is required for Cloudflare Computer’s just-bash backend. It is beta-gated on the Cloudflare account.
+Put that `signingSecret` in `.dev.vars` as `SPECTRUM_WEBHOOK_SECRET`. Restart `vite dev`. Photon requires `https://` and a public address (Quick Tunnel satisfies both). If the tunnel origin changes, [list](https://photon.codes/docs/webhooks/managing-webhooks) / delete the old URL and register the new one (same body shape; new secret).
 
-The sidecar must be a **Node or Bun** host the Worker can reach. A production Worker cannot call `127.0.0.1` on your laptop.
+5. **Bind** — text the DM Test Space from iMessage. That signed `messages` POST creates the Trip. Do not `POST /agents/trip-planner/...` before this. `/internal/imessage-simulate` is an escape hatch, not the demo Bind path.
 
-## Local path: one message, one reply
+`npx flue run` does **not** emulate Cloudflare. Agent modules import `cloudflare:workers` — use `vite dev`.
+
+### Proof commands (usable-core)
+
+Minimum proof: webhook/curl transcripts for two inbound turns, one Nudge, one research tick, and one sidecar Outbound send, plus the ledger key and provider message id. Capture locally; do not commit secrets.
+
+Two inbound turns on `trip:boys-vegas-2026` are iMessage texts to the DM Test Space (Photon → `POST /channels/imessage/webhook`). Save the Vite webhook lines (`200` / `ok`). Then read the same Trip:
 
 ```sh
-npm run dev
+curl -sS 'http://localhost:5173/agents/trip-planner/trip:boys-vegas-2026'
 ```
+
+Nudge and research tick (do not wait for `scheduleEvery`):
+
+```sh
+curl -sS -D - -X POST 'http://localhost:5173/internal/nudge/trip:boys-vegas-2026'
+curl -sS -D - -X POST 'http://localhost:5173/internal/research-tick/trip:boys-vegas-2026'
+```
+
+One sidecar Outbound send: save the `spectrum-sender` `POST /send` body (`providerMessageId`). Ledger key + provider message id from `/workspace/ledger/outbound.json` or that sidecar/tool response.
+
+### HTTP turns after Bind (not first contact)
+
+After the webhook has created the Trip, an HTTP user turn shares that history. **Do not** run this before Bind.
 
 ```sh
 curl -X POST 'http://localhost:5173/agents/trip-planner/trip:boys-vegas-2026' \
@@ -128,17 +168,27 @@ curl -X POST 'http://localhost:5173/agents/trip-planner/trip:boys-vegas-2026' \
   -d '{"kind":"user","body":"This week we want to find a hotel for the Madrid section of the trip."}'
 ```
 
-That HTTP turn can write `/workspace/sections/madrid.md` and `upsert_scheduled_task`. It cannot text the group until a space is bound (real webhook or simulate **on the first dispatch** that creates the conversation) **and** the sidecar is up. `initialData` is how the Photon `space.id` is stored; do not HTTP-prime a trip if you still need to bind iMessage.
+### Simulate (escape hatch, not Bind)
 
-Bind a space without Photon:
+Omit `spaceId` and the default is `local-dev-group`, which Photon cannot send to. Do not use this for the usable-core demo.
 
 ```sh
 curl -X POST 'http://localhost:5173/internal/imessage-simulate/trip:boys-vegas-2026' \
   -H 'content-type: application/json' \
-  -d '{"text":"Lock a Madrid hotel this week.","spaceId":"your-imessage-group-guid","spaceType":"group","phone":"+15551234567"}'
+  -d '{"text":"Lock a Madrid hotel this week.","spaceId":"your-imessage-dm-guid","spaceType":"dm"}'
 ```
 
-`npx flue run` does **not** emulate Cloudflare. Agent modules import `cloudflare:workers` — use `vite dev`.
+### Production secrets (deployed Worker)
+
+Local `.dev.vars` is enough for `vite dev`. For a deployed Worker:
+
+```sh
+npx wrangler secret put SPECTRUM_WEBHOOK_SECRET
+npx wrangler secret put SPECTRUM_BRIDGE_TOKEN
+npx wrangler secret put AGENT_HTTP_TOKEN
+```
+
+`SPECTRUM_BRIDGE_URL` must be a URL the deployed Worker can reach. A production Worker cannot call `127.0.0.1` on your laptop. The sidecar must be a **Node or Bun** host.
 
 ## How the schedules fire
 
