@@ -20,6 +20,10 @@ _Avoid_: Channel, conversation, chat, group (when you mean Photon’s thread)
 A Space used only to prove one Outbound send, not the production boys group.
 _Avoid_: Live group, production space
 
+**Bind**:
+The first inbound that creates a Trip and stores the Space on `initialData`. For the usable-core demo, Bind is a Photon `messages` webhook on `/channels/imessage/webhook`.
+_Avoid_: HTTP-prime (creating the Trip with `POST /agents/...` before a Space exists — Flue ignores later Space fields)
+
 **Section**:
 A city or leg of a Trip whose facts are kept together.
 _Avoid_: Destination (that word is the Wayfinder end-state), stop, city file

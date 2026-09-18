@@ -1,13 +1,19 @@
 # Copy to `.dev.vars` for `vite dev` / `wrangler dev`.
 # Cloudflare loads `.dev.vars` into the local Worker. Do not also keep a
 # conflicting `.env` — when `.dev.vars` exists, `.env` is not loaded.
+# Never commit `.dev.vars`. Restart `vite dev` after changing these values.
 
-# Photon native webhook signing secret (from webhook registration).
+# Photon one-time `signingSecret` from webhook registration
+# (POST https://spectrum.photon.codes/projects/{projectId}/webhooks/).
+# Not `standardSigningSecret` / `whsec_`. Required for Bind:
+# public cloudflared origin + /channels/imessage/webhook.
 SPECTRUM_WEBHOOK_SECRET=
 
 # Node sidecar that runs spectrum-ts and calls space.send.
+# Local URL is fine for vite → sidecar. A production Worker cannot reach 127.0.0.1.
 SPECTRUM_BRIDGE_URL=http://127.0.0.1:8788
 SPECTRUM_BRIDGE_TOKEN=
 
 # Optional. When set, /agents/* and /internal/* require `Authorization: Bearer <token>`.
+# Leave unset for the usable-core demo curls.
 AGENT_HTTP_TOKEN=
